@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torre 59 · Portal de copropietarios</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#f4f1ea; --card:#ffffff; --ink:#1d2b28; --muted:#5f6f6b;
+  --brand:#0f5c4d; --brand-2:#e0a82e; --ok:#1c7c4d; --ok-bg:#dff3e7;
+  --bad:#b3261e; --bad-bg:#fbe3e0; --warn:#9a6a00; --warn-bg:#fff0cc; --line:#e3ddd0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:18px;line-height:1.5}
+header{background:var(--brand);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{margin:0;font-size:1.35rem;letter-spacing:.3px}
+header small{opacity:.85;display:block;font-size:.8rem}
+main{max-width:980px;margin:0 auto;padding:20px}
+.card{background:var(--card);border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+h2{margin:0 0 12px;font-size:1.25rem}
+label{display:block;font-weight:600;margin:14px 0 6px}
+input,select,button{font:inherit}
+input,select{width:100%;padding:14px;border:2px solid var(--line);border-radius:12px;background:#fff}
+input:focus,select:focus{outline:none;border-color:var(--brand)}
+button{cursor:pointer;border:0;border-radius:12px;padding:14px 22px;font-weight:700;background:var(--brand);color:#fff}
+button.sec{background:#fff;color:var(--brand);border:2px solid var(--brand)}
+button.ghost{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.6);padding:8px 14px}
+button:disabled{opacity:.6}
+.login{max-width:420px;margin:40px auto}
+.login .logo{font-size:2.6rem;text-align:center}
+.err{color:var(--bad);font-weight:600;margin-top:12px}
+.ok{color:var(--ok);font-weight:600;margin-top:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px}
+.kpi{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.kpi .t{color:var(--muted);font-size:.9rem}
+.kpi .v{font-size:1.7rem;font-weight:800;margin-top:4px}
+.badge{display:inline-block;padding:6px 14px;border-radius:999px;font-weight:800;font-size:.95rem}
+.badge.ok{background:var(--ok-bg);color:var(--ok);margin:0}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.big{font-size:2.2rem;font-weight:800}
+.meses{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.mes{border-radius:14px;padding:14px;text-align:center;font-weight:700}
+.mes small{display:block;font-weight:600;margin-top:2px}
+.mes.ok{background:var(--ok-bg);color:var(--ok)}
+.mes.bad{background:var(--bad-bg);color:var(--bad)}
+.mes.warn{background:var(--warn-bg);color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.5px}
+td.n,th.n{text-align:right}
+.scroll{overflow-x:auto}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tabs button{background:#fff;color:var(--brand);border:2px solid var(--brand)}
+.tabs button.on{background:var(--brand);color:#fff}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.chk{display:flex;align-items:center;gap:10px;margin-top:14px}
+.chk input{width:auto;transform:scale(1.4)}
+.hide{display:none}
+footer{text-align:center;color:var(--muted);font-size:.8rem;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>🏢 Torre 59<small>Portal de copropietarios</small></h1></div>
+  <button id="btnSalir" class="ghost hide">Salir</button>
+</header>
+<main id="app"></main>
+<footer>Torre 59 · Administración transparente</footer>
+
+<script>
+const SUPABASE_URL = 'https://sisjpkdyoejuneanyscb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_f-p_sv6CmpuTEqy_e4femg_fdJqawox';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const cop = n => new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n||0);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+/* ---------- Sesión ---------- */
+$('btnSalir').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session) return pantallaLogin();
+  const { data: perfil } = await sb.from('perfiles').select('apartamento, es_admin').eq('user_id', session.user.id).maybeSingle();
+  if(!perfil){ await sb.auth.signOut(); return pantallaLogin('Tu usuario no tiene un apartamento asignado.'); }
+  $('btnSalir').classList.remove('hide');
+  perfil.es_admin ? vistaAdmin() : vistaPropietario(perfil.apartamento);
+}
+
+function pantallaLogin(msg=''){
+  $('btnSalir').classList.add('hide');
+  app.innerHTML = `
+  <div class="card login">
+    <div class="logo">🏢</div>
+    <h2 style="text-align:center">Ingresa a tu apartamento</h2>
+    <label for="u">Número de apartamento</label>
+    <input id="u" inputmode="numeric" autocomplete="username" placeholder="Ej: 504">
+    <label for="p">Clave</label>
+    <input id="p" type="password" autocomplete="current-password" placeholder="Tu clave">
+    <button id="go" style="width:100%;margin-top:20px">Entrar</button>
+    <div id="msg" class="err">${esc(msg)}</div>
+  </div>`;
+  const entrar = async () => {
+    const u = $('u').value.trim().toLowerCase(), p = $('p').value;
+    if(!u || !p) { $('msg').textContent = 'Escribe tu apartamento y tu clave.'; return; }
+    const email = u === 'admin' ? 'admin@torre59.app' : (/^\d+$/.test(u) ? `apto${u}@torre59.app` : '');
+    if(!email){ $('msg').textContent = 'El apartamento debe ser un número.'; return; }
+    $('go').disabled = true; $('msg').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email, password: p });
+    if(error){ $('go').disabled = false; $('msg').textContent = 'Apartamento o clave incorrectos.'; return; }
+    init();
+  };
+  $('go').onclick = entrar;
+  $('p').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
+}
+
+/* ---------- Datos comunes ---------- */
+async function parametros(){
+  const { data } = await sb.from('parametros').select('clave, valor');
+  const o = {}; (data||[]).forEach(r => o[r.clave] = r.valor);
+  return { cuota:o.cuota||30000, meses:o.meses_facturados||0, honorarios:o.honorarios_mensuales||250000 };
+}
+const MES_INICIO = 5; // el cobro empezó en mayo
+
+function tablaEgresos(egresos){
+  if(!egresos.length) return '<p>Aún no hay gastos registrados.</p>';
+  return `<div class="scroll"><table>
+    <tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th class="n">Valor</th><th>Soporte</th></tr>
+    ${egresos.map(e=>`<tr><td>${esc(e.fecha)}</td><td>${esc(e.concepto)}</td><td>${esc(e.categoria)}</td><td class="n">${cop(e.valor)}</td><td>${e.tiene_soporte?'✅':'⚠️'}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+/* ---------- Vista propietario ---------- */
+async function vistaPropietario(apto){
+  app.innerHTML = '<div class="card">Cargando…</div>';
+  const [par, pagosR, egrR] = await Promise.all([
+    parametros(),
+    sb.from('pagos').select('mes, valor, fecha_registro').eq('apartamento', apto).order('fecha_registro'),
+    sb.from('egresos').select('*').order('fecha', {ascending:false})
+  ]);
+  const pagos = pagosR.data||[], egresos = egrR.data||[];
+  const pagado = pagos.reduce((s,p)=>s+p.valor,0);
+  const esperado = par.cuota * par.meses;
+  const saldo = esperado - pagado;
+  const alDia = saldo <= 0;
+
+  let mesesHtml = '';
+  for(let i=0;i<par.meses;i++){
+    const hasta = par.cuota*(i+1), desde = par.cuota*i;
+    const cls = pagado >= hasta ? 'ok' : (pagado > desde ? 'warn' : 'bad');
+    const txt = cls==='ok' ? 'Pagado' : (cls==='warn' ? 'Abono parcial' : 'Pendiente');
+    mesesHtml += `<div class="mes ${cls}">${MESES[MES_INICIO-1+i]}<small>${txt}</small></div>`;
+  }
+  const totalGastos = egresos.reduce((s,e)=>s+e.valor,0);
+
+  app.innerHTML = `
+  <div class="card">
+    <div style="color:var(--muted)">Estado de cuenta</div>
+    <div class="big">Apartamento ${esc(apto)}</div>
+    <p><span class="badge ${alDia?'ok':'bad'}">${alDia?'✔ Al día':'Pendiente de pago'}</span></p>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="t">Total pagado</div><div class="v">${cop(pagado)}</div></div>
+    <div class="kpi"><div class="t">Total esperado</div><div class="v">${cop(esperado)}</div></div>
+    <div class="kpi"><div class="t">${saldo>0?'Saldo pendiente':'Saldo a favor'}</div><div class="v" style="color:${saldo>0?'var(--bad)':'var(--ok)'}">${cop(Math.abs(saldo))}</div></div>
+  </div>
+  <div class="card"><h2>Mes a mes</h2><div class="meses">${mesesHtml||'<p>Aún no hay meses facturados.</p>'}</div>
+    <p style="color:var(--muted);font-size:.9rem;margin-bottom:0">Cuota mensual: ${cop(par.cuota)}. Los pagos se aplican a los meses más antiguos primero.</p></div>
+  <div class="card"><h2>Mis pagos registrados</h2>
+    ${pagos.length ? `<div class="scroll"><table><tr><th>Mes</th><th class="n">Valor</th><th>Registrado</th></tr>
+      ${pagos.map(p=>`<tr><td>${MESES[p.mes-1]}</td><td class="n">${cop(p.valor)}</td><td>${new Date(p.fecha_registro).toLocaleDateString('es-CO')}</td></tr>`).join('')}</table></div>` : '<p>Todavía no hay pagos registrados.</p>'}
+  </div>
+  <div class="card"><h2>En qué se ha gastado</h2>
+    <p style="color:var(--muted)">Total gastado por la torre: <b>${cop(totalGastos)}</b></p>
+    ${tablaEgresos(egresos)}
+  </div>`;
+}
+
+/* ---------- Vista administrador ---------- */
+async function vistaAdmin(tab='resumen'){
+  app.innerHTML = '<div class="card">Cargando…</div>';
+  const [par, estR, egrR, pagR] = await Promise.all([
+    parametros(),
+    sb.from('estado_cuenta').select('*').order('apartamento'),
+    sb.from('egresos').select('*').order('fecha', {ascending:false}),
+    sb.from('pagos').select('valor')
+  ]);
+  const est = estR.data||[], egresos = egrR.data||[];
+  const recaudado = (pagR.data||[]).reduce((s,p)=>s+p.valor,0);
+  const gastado = egresos.reduce((s,e)=>s+e.valor,0);
+  const cartera = est.reduce((s,e)=>s+Math.max(e.saldo,0),0);
+  const honPagados = egresos.filter(e=>e.categoria==='Honorarios administración').reduce((s,e)=>s+e.valor,0);
+  const honPend = Math.max(par.honorarios*par.meses - honPagados, 0);
+
+  const tabs = [['resumen','📊 Resumen'],['pago','💵 Registrar pago'],['egreso','🧾 Registrar gasto'],['config','⚙️ Ajustes']];
+  let cuerpo = '';
+
+  if(tab==='resumen'){
+    cuerpo = `
+    <div class="kpis">
+      <div class="kpi"><div class="t">Recaudado</div><div class="v">${cop(recaudado)}</div></div>
+      <div class="kpi"><div class="t">Gastado</div><div class="v">${cop(gastado)}</div></div>
+      <div class="kpi"><div class="t">Disponible en caja</div><div class="v">${cop(recaudado-gastado)}</div></div>
+      <div class="kpi"><div class="t">Cartera pendiente</div><div class="v" style="color:var(--bad)">${cop(cartera)}</div></div>
+      <div class="kpi"><div class="t">Honorarios por pagar</div><div class="v">${cop(honPend)}</div></div>
+    </div>
+    <div class="card"><h2>Apartamentos</h2>
+      <div class="scroll"><table><tr><th>Apto</th><th class="n">Pagado</th><th class="n">Esperado</th><th class="n">Saldo</th><th>Estado</th></tr>
+      ${est.map(e=>`<tr><td><b>${e.apartamento}</b></td><td class="n">${cop(e.total_pagado)}</td><td class="n">${cop(e.total_esperado)}</td><td class="n">${cop(e.saldo)}</td>
+        <td><span class="badge ${e.saldo<=0?'ok':'bad'}">${e.saldo<=0?'Al día':'Pendiente'}</span></td></tr>`).join('')}
+      </table></div></div>
+    <div class="card"><h2>Gastos</h2>${tablaEgresos(egresos)}</div>`;
+  }
+
+  if(tab==='pago'){
+    cuerpo = `<div class="card"><h2>Registrar pago</h2>
+      <div class="row">
+        <div><label>Apartamento</label><select id="fa">${est.map(e=>`<option>${e.apartamento}</option>`).join('')}</select></div>
+        <div><label>Mes que paga</label><select id="fm">${MESES.map((m,i)=>`<option value="${i+1}" ${i+1===MES_INICIO+Math.max(par.meses-1,0)?'selected':''}>${m}</option>`).join('')}</select></div>
+        <div><label>Valor</label><input id="fv" type="number" inputmode="numeric" value="${par.cuota}"></div>
+      </div>
+      <button id="gp" style="margin-top:20px">Guardar pago</button><div id="m"></div>
+      <p style="color:var(--muted);font-size:.9rem">Si pagan dos meses juntos, registra un solo pago por el valor total (ej. 60.000).</p></div>`;
+  }
+
+  if(tab==='egreso'){
+    const hoy = new Date().toISOString().slice(0,10);
+    cuerpo = `<div class="card"><h2>Registrar gasto</h2>
+      <div class="row">
+        <div><label>Fecha</label><input id="gf" type="date" value="${hoy}"></div>
+        <div><label>Valor</label><input id="gv" type="number" inputmode="numeric"></div>
+      </div>
+      <label>Concepto</label><input id="gc" placeholder="Ej: Reparación de cámaras">
+      <div class="row">
+        <div><label>Categoría</label><select id="gk"><option>Honorarios administración</option><option>Mantenimiento</option><option>Papelería</option><option>Servicios públicos</option><option>Aseo</option><option>Otros</option></select></div>
+        <div><label>Aprobado por</label><input id="gap" placeholder="Comité / Administrador"></div>
+      </div>
+      <label>Observaciones</label><input id="go2">
+      <label class="chk"><input id="gs" type="checkbox" checked> Tiene soporte (factura, recibo o foto)</label>
+      <button id="ge" style="margin-top:20px">Guardar gasto</button><div id="m"></div></div>`;
+  }
+
+  if(tab==='config'){
+    cuerpo = `<div class="card"><h2>Ajustes</h2>
+      <div class="row">
+        <div><label>Cuota mensual por apartamento</label><input id="pc" type="number" value="${par.cuota}"></div>
+        <div><label>Meses facturados (desde mayo)</label><input id="pm" type="number" value="${par.meses}"></div>
+        <div><label>Honorarios mensuales del administrador</label><input id="ph" type="number" value="${par.honorarios}"></div>
+      </div>
+      <button id="gcfg" style="margin-top:20px">Guardar ajustes</button><div id="m"></div>
+      <p style="color:var(--muted);font-size:.9rem">Cada mes que pase, sube “Meses facturados” en 1 para que el sistema cobre el mes nuevo.</p></div>`;
+  }
+
+  app.innerHTML = `<div class="tabs">${tabs.map(([k,l])=>`<button class="${k===tab?'on':''}" data-t="${k}">${l}</button>`).join('')}</div>${cuerpo}`;
+  app.querySelectorAll('.tabs button').forEach(b => b.onclick = () => vistaAdmin(b.dataset.t));
+
+  const msg = (t, ok=true) => { const m=$('m'); m.className = ok?'ok':'err'; m.textContent = t; };
+
+  if($('gp')) $('gp').onclick = async () => {
+    const valor = parseInt($('fv').value,10);
+    if(!valor || valor<=0) return msg('Escribe un valor válido.', false);
+    $('gp').disabled = true;
+    const { error } = await sb.from('pagos').insert({ apartamento:+$('fa').value, mes:+$('fm').value, anio:2026, valor });
+    $('gp').disabled = false;
+    error ? msg('No se pudo guardar: '+error.message, false) : msg(`✔ Pago de ${cop(valor)} guardado para el apto ${$('fa').value}.`);
+  };
+  if($('ge')) $('ge').onclick = async () => {
+    const valor = parseInt($('gv').value,10), concepto = $('gc').value.trim();
+    if(!valor || valor<=0 || !concepto) return msg('Completa concepto y valor.', false);
+    const soporte = $('gs').checked;
+    if(!soporte && !confirm('Este gasto no tiene soporte. ¿Guardarlo de todas formas?')) return;
+    $('ge').disabled = true;
+    const { error } = await sb.from('egresos').insert({ fecha:$('gf').value, concepto, categoria:$('gk').value, valor, tiene_soporte:soporte, aprobado_por:$('gap').value.trim(), observaciones:$('go2').value.trim() });
+    $('ge').disabled = false;
+    error ? msg('No se pudo guardar: '+error.message, false) : msg('✔ Gasto guardado.');
+  };
+  if($('gcfg')) $('gcfg').onclick = async () => {
+    const filas = [['cuota',+$('pc').value],['meses_facturados',+$('pm').value],['honorarios_mensuales',+$('ph').value]];
+    const { error } = await sb.from('parametros').upsert(filas.map(([clave,valor])=>({clave,valor})));
+    error ? msg('No se pudo guardar: '+error.message, false) : msg('✔ Ajustes guardados.');
+  };
+}
+
+init();
+</script>
+</body>
+</html>

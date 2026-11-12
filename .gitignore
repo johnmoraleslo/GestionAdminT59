@@ -1,0 +1,4 @@
+# Nunca subir claves, datos ni scripts de base de datos
+*.csv
+*.sql
+*.xlsx
